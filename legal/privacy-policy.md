@@ -1,8 +1,8 @@
-# Privacy Policy for Playify
+# Privacy Policy for bxh-music-bot
 
 **Last Updated:** 06/29/2025
 
-This Privacy Policy describes how Playify ("the Bot") collects, uses, and handles data when you use it on your Discord server.
+This Privacy Policy describes how bxh-music-bot ("the Bot") collects, uses, and handles data when you use it on your Discord server.
 
 ## Data We Collect
 

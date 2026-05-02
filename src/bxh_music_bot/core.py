@@ -1,4 +1,4 @@
-"""Core configuration and shared state for Playify."""
+"""Core configuration and shared state for bxh-music-bot."""
 
 # ==============================================================================
 # 1. IMPORTS & GLOBAL CONFIGURATION
@@ -49,7 +49,7 @@ from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = PROJECT_ROOT / "data"
-DB_PATH = DATA_DIR / "playify_state.db"
+DB_PATH = DATA_DIR / "bxh-music-bot_state.db"
 I18N_DIR = PROJECT_ROOT / "i18n"
 
 load_dotenv(PROJECT_ROOT / ".env")
@@ -219,13 +219,14 @@ FILTER_DISPLAY_NAMES = {
 # Intents for the bot
 intents = discord.Intents.default()
 intents.guilds = True
+intents.members = True
 intents.voice_states = True
 intents.message_content = True
 
 
 # Create the bot
 # --- Definition of our custom bot class ---
-class PlayifyBot(commands.Bot):
+class BxhMusicBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -241,11 +242,18 @@ class PlayifyBot(commands.Bot):
 # Intents for the bot
 intents = discord.Intents.default()
 intents.guilds = True
+intents.members = True
 intents.voice_states = True
 intents.message_content = True
 
+member_cache = discord.MemberCacheFlags.all()
+
 # Create the bot
-bot = PlayifyBot(command_prefix="!", intents=intents)
+bot = BxhMusicBot(
+    command_prefix="!",
+    intents=intents,
+    member_cache_flags=member_cache,
+)
 
 # ==============================================================================
 # 2. CORE CLASSES & STATE MANAGEMENT

@@ -1,4 +1,4 @@
-"""Application assembly and runtime entrypoint for Playify."""
+"""Application assembly and runtime entrypoint for bxh-music-bot."""
 
 from .core import *
 from .models.lazy_search import *

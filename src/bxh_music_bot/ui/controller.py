@@ -1,4 +1,4 @@
-"""Controller views and embeds for the Playify UI."""
+"""Controller views and embeds for the bxh-music-bot UI."""
 
 from ..core import *
 from ..helpers.common import *

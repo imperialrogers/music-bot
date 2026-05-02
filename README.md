@@ -1,13 +1,13 @@
-<h1 align="center">Playify ♪(｡◕‿◕｡)</h1>
+<h1 align="center">bxh-music-bot ♪(｡◕‿◕｡)</h1>
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/5c1d5fba-3a34-4ffe-bd46-ef68e1175360" alt="Playify Banner" width="900">
+  <img src="https://github.com/user-attachments/assets/5c1d5fba-3a34-4ffe-bd46-ef68e1175360" alt="bxh-music-bot Banner" width="900">
 </p>
 
 ---
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/alan7383/playify.svg" alt="GitHub license" />
+  <img src="https://img.shields.io/github/license/alan7383/bxh-music-bot.svg" alt="GitHub license" />
   <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="Python 3.9+" />
 </p>
 
@@ -24,7 +24,7 @@
 
 ## Table of Contents
 
-* [What is Playify?](#what-is-playify)
+* [What is bxh-music-bot?](#what-is-bxh-music-bot)
 * [Spotify Support](#spotify-support)
 * [Key Features](#key-features)
 * [Installation](#installation)
@@ -39,10 +39,10 @@
 
 
 
-<a id="what-is-playify"></a>
-## ＼(＾O＾)／ What is Playify?
+<a id="what-is-bxh-music-bot"></a>
+## ＼(＾O＾)／ What is bxh-music-bot?
 
-Playify is the ultimate minimalist Discord music bot—no ads, no premium tiers, no limits, just music and kawaii vibes!
+bxh-music-bot is the ultimate minimalist Discord music bot—no ads, no premium tiers, no limits, just music and kawaii vibes!
 
 * **No web UI**: Only simple slash commands.
 * **100% free**: All features unlocked for everyone.
@@ -76,7 +76,7 @@ Type `/play <url or query>` and let the music flow~
 <a id="installation"></a>
 ## (＾∀＾) Installation
 
-You can run Playify in two ways. The Docker method is recommended for most users as it's simpler and manages all dependencies for you.
+You can run bxh-music-bot in two ways. The Docker method is recommended for most users as it's simpler and manages all dependencies for you.
 
 ### (🐳) Method 1: Docker Setup (Recommended)
 
@@ -84,8 +84,8 @@ This is the easiest way to get the bot running.
 
 1.  **Clone the repository and enter it:**
     ```bash
-    git clone [https://github.com/alan7383/playify.git](https://github.com/alan7383/playify.git)
-    cd playify
+    git clone [https://github.com/alan7383/bxh-music-bot.git](https://github.com/alan7383/bxh-music-bot.git)
+    cd bxh-music-bot
     ```
 2.  **Create your secret file:**
     Copy the example file to create your own configuration.
@@ -119,8 +119,8 @@ This is the easiest way to get the bot running.
 **Steps:**
 1.  Clone the repo:
     ```bash
-    git clone [https://github.com/alan7383/playify.git](https://github.com/alan7383/playify.git)
-    cd playify
+    git clone [https://github.com/alan7383/bxh-music-bot.git](https://github.com/alan7383/bxh-music-bot.git)
+    cd bxh-music-bot
     ```
 2.  Install dependencies:
     ```bash
@@ -134,7 +134,7 @@ This is the easiest way to get the bot running.
     **Edit the `.env` file** with your tokens as shown in the Docker method.
 4.  Run the bot:
     ```bash
-    python playify.py
+    python bxh-music-bot.py
     ```
 
 ### Inviting the Bot to Discord (for both methods)
@@ -153,7 +153,7 @@ This is the easiest way to get the bot running.
 
 Unfortunately, due to stricter limitations from Google and YouTube, the public instance was detected as a bot and blocked. Maintaining a public instance that serves thousands of servers became impossible without hitting these bans constantly.
 
-To use Playify, please **self-host** it using the [Docker](#installation) or manual methods above! It's much safer and ensures your music won't be interrupted.
+To use bxh-music-bot, please **self-host** it using the [Docker](#installation) or manual methods above! It's much safer and ensures your music won't be interrupted.
 
 ---
 
@@ -207,7 +207,7 @@ Now that I am back, I am actively reviewing contributions!
 
 * **Found a bug?** Open an Issue—I'm listening!
 * **Want a new feature?** Fork the repo and open a Pull Request. All contributions are welcome!
-* **Star the repository** if you enjoy using Playify!
+* **Star the repository** if you enjoy using bxh-music-bot!
 
 <a id="license"></a>
 ## (＾ω＾) License

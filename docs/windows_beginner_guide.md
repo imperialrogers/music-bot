@@ -1,11 +1,11 @@
-# 🌸 The Absolute Beginner's Guide to Running Playify on Windows
+# 🌸 The Absolute Beginner's Guide to Running bxh-music-bot on Windows
 
 Don't know anything about coding, Docker, or Python? **Don't panic!** (つ≧▽≦)つ
 This guide is made specially for you. We'll set up the bot step-by-step!
 
-## Step 1: Download Playify
+## Step 1: Download bxh-music-bot
 
-1. Go to the [Playify GitHub page](https://github.com/alan7383/playify).
+1. Go to the [bxh-music-bot GitHub page](https://github.com/alan7383/bxh-music-bot).
 2. Click the green **"<> Code"** button.
 3. Click **"Download ZIP"**.
 4. Extract the ZIP file anywhere on your computer (for example, on your Desktop). Open the folder so you can see all the files.
@@ -13,7 +13,7 @@ This guide is made specially for you. We'll set up the bot step-by-step!
 
 ## Step 2: Run the Bot!
 
-1. In the Playify folder, find the file named `start.bat` (or just `start` with a gear/batch icon).
+1. In the bxh-music-bot folder, find the file named `start.bat` (or just `start` with a gear/batch icon).
 2. **Double-click** it!
    - 🪄 *Magic:* If you don't have Python installed, the script will automatically download and install it for you!
    - If that happens, it will ask you to close the window and double-click `start.bat` one more time.
@@ -26,7 +26,7 @@ This guide is made specially for you. We'll set up the bot step-by-step!
 ### FAQ / Troubleshooting 🛠️
 
 **Q: The bot says "FFmpeg is not found" when trying to play music!**
-A: Playify normally downloads FFmpeg automatically. If it failed, you can manually download `ffmpeg.exe` and place it in the **`bin`** folder (create it if it doesn't exist).
+A: bxh-music-bot normally downloads FFmpeg automatically. If it failed, you can manually download `ffmpeg.exe` and place it in the **`bin`** folder (create it if it doesn't exist).
 ⬇ [Download FFmpeg 6.1.1 here](https://www.videohelp.com/download/ffmpeg-6.1.1-full_build.7z?r=zndlFgBq) (extract and grab `ffmpeg.exe` from the `bin` folder).
 
 **Q: Do I need to enter my tokens every time?**

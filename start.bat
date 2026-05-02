@@ -1,10 +1,10 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
-title Playify - Bot Launcher
+title bxh-music-bot - Bot Launcher
 color 0b
 
 cd /d "%~dp0" || (
-    echo [ERROR] Could not switch to the Playify folder.
+    echo [ERROR] Could not switch to the bxh-music-bot folder.
     pause
     exit /b 1
 )
@@ -14,15 +14,15 @@ set "PATH=%ROOT%\bin;%PATH%"
 set "PYTHON="
 set "PYTHON_INSTALLED_BY_START=0"
 set "VENV_PYTHON=%ROOT%\.venv\Scripts\python.exe"
-set "PYTHON_INSTALLER=%TEMP%\playify-python-3.12.3.exe"
+set "PYTHON_INSTALLER=%TEMP%\bxh-music-bot-python-3.12.3.exe"
 set "PYTHON_URL=https://www.python.org/ftp/python/3.12.3/python-3.12.3-amd64.exe"
 
 echo ========================================
-echo       Playify - Discord Music Bot
+echo       bxh-music-bot - Discord Music Bot
 echo ========================================
 echo.
 
-if not exist "%ROOT%\playify.py" goto missing_entrypoint
+if not exist "%ROOT%\bxh-music-bot.py" goto missing_entrypoint
 if not exist "%ROOT%\requirements.txt" goto missing_requirements
 
 call :prepare_python
@@ -38,8 +38,8 @@ if not exist "%ROOT%\.env" goto setup_env
 goto run_bot
 
 :run_bot
-echo [INFO] Starting Playify...
-"%PYTHON%" "%ROOT%\playify.py"
+echo [INFO] Starting bxh-music-bot...
+"%PYTHON%" "%ROOT%\bxh-music-bot.py"
 
 echo.
 echo The bot has crashed or stopped.
@@ -89,7 +89,7 @@ if errorlevel 1 goto install_python
 
 call :is_supported_python "%PYTHON%"
 if errorlevel 1 (
-    echo [!] Found Python, but Playify needs Python 3.9 through 3.13.
+    echo [!] Found Python, but bxh-music-bot needs Python 3.9 through 3.13.
     "%PYTHON%" --version
     goto install_python
 )
@@ -119,7 +119,7 @@ exit /b 1
 exit /b %ERRORLEVEL%
 
 :install_python
-echo [!] Python 3.9-3.13 was not found. Installing Python 3.12 for Playify...
+echo [!] Python 3.9-3.13 was not found. Installing Python 3.12 for bxh-music-bot...
 echo Downloading Python 3.12.3...
 curl -fL -o "%PYTHON_INSTALLER%" "%PYTHON_URL%"
 if errorlevel 1 goto python_failed
@@ -277,13 +277,13 @@ if errorlevel 1 goto deps_failed
 exit /b 0
 
 :missing_entrypoint
-echo [ERROR] playify.py was not found next to start.bat.
-echo Make sure start.bat is inside the Playify folder you extracted.
+echo [ERROR] bxh-music-bot.py was not found next to start.bat.
+echo Make sure start.bat is inside the bxh-music-bot folder you extracted.
 goto fail
 
 :missing_requirements
 echo [ERROR] requirements.txt was not found next to start.bat.
-echo Make sure the Playify folder was extracted completely.
+echo Make sure the bxh-music-bot folder was extracted completely.
 goto fail
 
 :python_failed
@@ -292,7 +292,7 @@ echo Please install Python 3.12 from https://www.python.org/downloads/ and run s
 exit /b 1
 
 :venv_failed
-echo [ERROR] Could not create Playify's local Python environment.
+echo [ERROR] Could not create bxh-music-bot's local Python environment.
 echo Please install Python 3.12 from https://www.python.org/downloads/ and run start.bat again.
 exit /b 1
 

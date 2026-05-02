@@ -29,4 +29,4 @@ RUN pip install playwright --break-system-packages && \
 
 COPY . .
 
-CMD ["python", "playify.py"]
+CMD ["python", "bxh-music-bot.py"]

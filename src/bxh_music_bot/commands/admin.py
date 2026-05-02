@@ -1,8 +1,44 @@
 """Administrative and setup slash commands."""
 
+from typing import Annotated
+
 from ..core import *
 from ..helpers.common import *
 from ..ui.controller import update_controller
+
+class FlexibleTextChannelTransformer(app_commands.Transformer[discord.TextChannel]):
+    async def transform(self, interaction: discord.Interaction, value):
+        if isinstance(value, discord.TextChannel):
+            return value
+
+        if isinstance(value, str) and interaction.guild:
+            raw_value = value.strip()
+            if raw_value.startswith("<#") and raw_value.endswith(">"):
+                try:
+                    channel_id = int(raw_value[2:-1])
+                    channel = interaction.guild.get_channel(channel_id)
+                    if isinstance(channel, discord.TextChannel):
+                        return channel
+                except ValueError:
+                    pass
+
+            raw_value = raw_value.lstrip("#")
+            channel = discord.utils.get(
+                interaction.guild.text_channels, name=raw_value
+            )
+            if channel:
+                return channel
+
+        raise app_commands.TransformError(
+            value,
+            app_commands.AppCommandOptionType.channel,
+            self,
+        )
+
+ChannelInput = Annotated[
+    discord.TextChannel,
+    app_commands.Transform[discord.TextChannel, FlexibleTextChannelTransformer],
+]
 
 # /kaomoji command
 @bot.tree.command(name="kaomoji", description="Enable/disable kawaii mode")
@@ -62,7 +98,7 @@ class SetupCommands(app_commands.Group):
     async def controller(
         self,
         interaction: discord.Interaction,
-        channel: Optional[discord.TextChannel] = None,
+        channel: Optional[ChannelInput] = None,
     ):
         """Sets or updates the channel for the music controller."""
         if not interaction.guild:
@@ -121,11 +157,11 @@ class SetupCommands(app_commands.Group):
         self,
         interaction: discord.Interaction,
         reset: Optional[str] = None,
-        channel1: Optional[discord.TextChannel] = None,
-        channel2: Optional[discord.TextChannel] = None,
-        channel3: Optional[discord.TextChannel] = None,
-        channel4: Optional[discord.TextChannel] = None,
-        channel5: Optional[discord.TextChannel] = None,
+        channel1: Optional[ChannelInput] = None,
+        channel2: Optional[ChannelInput] = None,
+        channel3: Optional[ChannelInput] = None,
+        channel4: Optional[ChannelInput] = None,
+        channel5: Optional[ChannelInput] = None,
     ):
 
         guild_id = interaction.guild.id

@@ -1,7 +1,7 @@
 # .github/ISSUE_TEMPLATE/bug_report.yml
 
 name: "🐛 Bug Report"
-description: "Report a bug to help improve Playify."
+description: "Report a bug to help improve bxh-music-bot."
 title: "[BUG] - "
 labels: ["bug", "triage"]
 body:
@@ -75,4 +75,4 @@ body:
 
   - type: markdown
     attributes:
-      value: "Thanks for helping make Playify better! ✨"
+      value: "Thanks for helping make bxh-music-bot better! ✨"

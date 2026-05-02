@@ -201,6 +201,37 @@ async def global_interaction_check(interaction: discord.Interaction) -> bool:
     return False
 
 
+@bot.tree.error
+async def on_global_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    """Handle unexpected slash-command failures without crashing."""
+    base_error = (
+        error.original if isinstance(error, app_commands.CommandInvokeError) else error
+    )
+
+    if isinstance(base_error, app_commands.TransformerError):
+        message = (
+            "One of the command options could not be converted correctly. "
+            "Please choose a valid channel or enter the value again."
+        )
+    else:
+        message = (
+            "An unexpected error occurred while processing this command. "
+            "Please try again later."
+        )
+
+    logger.error("Unhandled slash command error", exc_info=error)
+
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(content=message, ephemeral=True)
+        else:
+            await interaction.response.send_message(content=message, ephemeral=True)
+    except Exception as send_error:
+        logger.error(f"Failed to send command error response: {send_error}")
+
+
 @bot.event
 async def on_ready():
     logger.info(f"{bot.user.name} is online.")

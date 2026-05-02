@@ -1571,13 +1571,16 @@ async def status(interaction: discord.Interaction):
     os_info = f"{platform.system()} {platform.release()}"
 
     guild_id = interaction.guild_id
+    cpu_freq_current = cpu_freq.current if cpu_freq else get_messages(
+        "status.not_applicable", guild_id
+    )
 
     embed = discord.Embed(
         title=get_messages("status.title", guild_id),
         description=get_messages("status.description", guild_id),
         color=0x2ECC71 if latency < 200 else (0xE67E22 if latency < 500 else 0xE74C3C),
     )
-    embed.set_thumbnail(url=bot.user.avatar.url)
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
 
     embed.add_field(
         name=get_messages("status.bot.title", guild_id),
@@ -1615,7 +1618,7 @@ async def status(interaction: discord.Interaction):
             guild_id,
             os_info=os_info,
             cpu_load=cpu_load,
-            cpu_freq_current=cpu_freq.current,
+            cpu_freq_current=cpu_freq_current,
             ram_used=ram_used,
             ram_total=ram_total,
             ram_percent=ram_percent,
@@ -1650,7 +1653,7 @@ async def status(interaction: discord.Interaction):
 
 
 @bot.tree.command(
-    name="support", description="Shows ways to support the creator of Playify."
+    name="support", description="Shows ways to support the creator of bxh-music-bot."
 )
 async def support(interaction: discord.Interaction):
     if not interaction.guild:
@@ -1674,7 +1677,7 @@ async def support(interaction: discord.Interaction):
         ),  # Gold for normal, Pink for kawaii
     )
 
-    patreon_link = "https://patreon.com/Playify"
+    patreon_link = "https://patreon.com/bxh-music-bot"
     paypal_link = "https://www.paypal.com/paypalme/alanmussot1"
     discord_server_link = "https://discord.gg/JeH8g6g3cG"
     discord_username = "@alananasssss"
@@ -1706,7 +1709,7 @@ async def support(interaction: discord.Interaction):
         inline=True,
     )
 
-    embed.set_thumbnail(url=bot.user.avatar.url)
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
     embed.set_footer(text=get_messages("support.footer", guild_id))
 
     await interaction.response.send_message(embed=embed, silent=SILENT_MESSAGES)

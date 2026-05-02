@@ -196,8 +196,83 @@ async def ensure_voice_connection(
     state = get_guild_state(guild_id)
     is_kawaii = state.locale == Locale.EN_X_KAWAII
 
-    member = interaction.guild.get_member(interaction.user.id)
-    if not member or not member.voice or not member.voice.channel:
+    member = None
+    if hasattr(interaction, "member") and interaction.member:
+        member = interaction.member
+        logger.debug(f"[{guild_id}] interaction.member -> {member}")
+
+    if not member and interaction.guild:
+        member = interaction.guild.get_member(interaction.user.id)
+        logger.debug(f"[{guild_id}] guild cache get_member -> {member}")
+
+    if not member and isinstance(interaction.user, discord.Member):
+        member = interaction.user
+        logger.debug(f"[{guild_id}] interaction.user -> {member}")
+
+    if not member and interaction.guild:
+        try:
+            member = await interaction.guild.fetch_member(interaction.user.id)
+            logger.debug(f"[{guild_id}] fetched member -> {member}")
+        except (discord.NotFound, discord.Forbidden):
+            member = None
+        except Exception as e:
+            logger.warning(
+                f"[{guild_id}] Could not fetch interaction member: {e}"
+            )
+            member = None
+
+    voice_state = getattr(member, "voice", None)
+    if interaction.guild:
+        guild_voice_states = getattr(interaction.guild, "voice_states", None)
+        logger.debug(
+            f"[{guild_id}] member.voice={voice_state}, guild.voice_states present={bool(guild_voice_states)}"
+        )
+        if not voice_state and guild_voice_states is not None:
+            voice_state = guild_voice_states.get(interaction.user.id)
+            logger.debug(
+                f"[{guild_id}] guild.voice_states lookup -> {voice_state}"
+            )
+
+    voice_channel = None
+    if voice_state and getattr(voice_state, "channel", None):
+        voice_channel = voice_state.channel
+    elif interaction.guild:
+        voice_channels = list(interaction.guild.voice_channels)
+        stage_channels = list(getattr(interaction.guild, "stage_channels", []))
+        all_voice_channels = voice_channels + stage_channels
+
+        if not all_voice_channels:
+            all_voice_channels = [
+                c
+                for c in interaction.guild.channels
+                if c.type in (discord.ChannelType.voice, discord.ChannelType.stage_voice)
+            ]
+            logger.info(
+                f"[{guild_id}] fallback scanning {len(all_voice_channels)} voice/stage channels by channel.type"
+            )
+        else:
+            logger.info(
+                f"[{guild_id}] scanning {len(all_voice_channels)} guild voice/stage channels for user {interaction.user.id}"
+            )
+
+        for channel in all_voice_channels:
+            logger.info(
+                f"[{guild_id}] channel={channel.name} type={channel.type} members={len(channel.members)}"
+            )
+            for member_in_voice in channel.members:
+                if member_in_voice.id == interaction.user.id:
+                    voice_channel = channel
+                    logger.info(
+                        f"[{guild_id}] found user in channel.members fallback -> {voice_channel}"
+                    )
+                    break
+            if voice_channel:
+                break
+
+    if not voice_channel:
+        logger.info(
+            f"[{guild_id}] No voice state found: member={member}, voice_state={voice_state}"
+        )
         embed = Embed(
             description=get_messages("error.no_voice_channel", guild_id),
             color=0xFF9AA2 if is_kawaii else discord.Color.red(),
@@ -212,7 +287,7 @@ async def ensure_voice_connection(
             )
         return None
 
-    voice_channel = member.voice.channel
+    voice_channel = voice_channel
     vc = interaction.guild.voice_client
 
     # --- ZOMBIE DETECTION & STATE SYNC ---

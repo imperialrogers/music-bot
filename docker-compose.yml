@@ -1,5 +1,5 @@
 services:
-  playify-discord-bot:
+  bxh-music-bot-discord-bot:
     env_file: .env
     build:
       context: .
