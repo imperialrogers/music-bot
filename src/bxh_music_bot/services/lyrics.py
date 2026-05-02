@@ -5,7 +5,7 @@ from ..helpers.common import *
 from ..ui.interactions import LyricsRetryView, LyricsView
 
 async def fetch_and_display_genius_lyrics(
-    interaction: discord.Interaction, fallback_message: str = None
+    interaction: discord.Interaction, fallback_message: Optional[str] = None
 ):
     """Fetches, formats, and displays lyrics using ONLY the authenticated Genius API to avoid 403 errors."""
     guild_id = interaction.guild_id
@@ -21,6 +21,13 @@ async def fetch_and_display_genius_lyrics(
             ephemeral=True,
         )
 
+    if not music_player.current_info:
+        return await interaction.followup.send(
+            get_messages("lyrics.error.no_song_playing", guild_id),
+            silent=SILENT_MESSAGES,
+            ephemeral=True,
+        )
+
     clean_title, artist_name = get_cleaned_song_info(
         music_player.current_info, guild_id
     )
@@ -29,9 +36,47 @@ async def fetch_and_display_genius_lyrics(
     try:
         logger.info(f"Attempting authenticated Genius API search: '{precise_query}'")
 
-        search_result = await loop.run_in_executor(
-            None, lambda: genius.search_songs(precise_query, per_page=5)
-        )
+        # Wrap the Genius API call to catch authentication errors
+        try:
+            search_result = await loop.run_in_executor(
+                None, lambda: genius.search_songs(precise_query, per_page=5)  # type: ignore[union-attr]
+            )
+        except AssertionError as auth_error:
+            # Handle 401 Unauthorized errors (invalid/expired token)
+            error_msg = str(auth_error)
+            if "401" in error_msg or "invalid_token" in error_msg.lower():
+                logger.error(
+                    f"Genius API authentication failed: Invalid or expired token. "
+                    f"Please update GENIUS_TOKEN in .env file. Error: {error_msg}"
+                )
+                await interaction.followup.send(
+                    "❌ Lyrics service unavailable: Invalid or expired Genius API token. "
+                    "Please contact the bot administrator to update the API credentials.",
+                    silent=SILENT_MESSAGES,
+                    ephemeral=True,
+                )
+                return
+            else:
+                # Re-raise if it's a different assertion error
+                raise
+        except requests.exceptions.RequestException as net_error:
+            # Handle network-related errors
+            logger.error(f"Network error while fetching lyrics: {net_error}")
+            await interaction.followup.send(
+                "❌ Lyrics unavailable: Network error. Please try again later.",
+                silent=SILENT_MESSAGES,
+                ephemeral=True,
+            )
+            return
+        except Exception as api_error:
+            # Handle other API errors (rate limiting, server errors, etc.)
+            logger.error(f"Genius API error during search: {api_error}", exc_info=True)
+            await interaction.followup.send(
+                "❌ Lyrics unavailable: The lyrics service is temporarily unavailable. Please try again later.",
+                silent=SILENT_MESSAGES,
+                ephemeral=True,
+            )
+            return
 
         song_info = None
         if search_result and search_result.get("hits"):
@@ -60,9 +105,36 @@ async def fetch_and_display_genius_lyrics(
         logger.info(
             f"Found song: {song_info['full_title']}. Fetching lyrics from URL: {song_info['url']}"
         )
-        song_object = await loop.run_in_executor(
-            None, lambda: genius.search_song(song_id=song_info["id"])
-        )
+        
+        # Wrap the lyrics fetch to catch authentication errors
+        try:
+            song_object = await loop.run_in_executor(
+                None, lambda: genius.search_song(song_id=song_info["id"])  # type: ignore[union-attr]
+            )
+        except AssertionError as auth_error:
+            # Handle 401 Unauthorized errors during lyrics fetch
+            error_msg = str(auth_error)
+            if "401" in error_msg or "invalid_token" in error_msg.lower():
+                logger.error(
+                    f"Genius API authentication failed during lyrics fetch: {error_msg}"
+                )
+                await interaction.followup.send(
+                    "❌ Lyrics unavailable: Invalid or expired Genius API token. "
+                    "Please contact the bot administrator to update the API credentials.",
+                    silent=SILENT_MESSAGES,
+                    ephemeral=True,
+                )
+                return
+            else:
+                raise
+        except requests.exceptions.RequestException as net_error:
+            logger.error(f"Network error while fetching lyrics content: {net_error}")
+            await interaction.followup.send(
+                "❌ Lyrics unavailable: Network error. Please try again later.",
+                silent=SILENT_MESSAGES,
+                ephemeral=True,
+            )
+            return
 
         if not song_object or not song_object.lyrics:
             raise ValueError(f"Could not retrieve lyrics for song ID {song_info['id']}")
@@ -109,8 +181,9 @@ async def fetch_and_display_genius_lyrics(
         view.message = message
 
     except Exception as e:
+        # Catch any remaining unexpected errors
         logger.error(
-            f"Error in authenticated lyrics fetch for '{precise_query}': {e}",
+            f"Unexpected error in lyrics fetch for '{precise_query}': {e}",
             exc_info=True,
         )
         await interaction.followup.send(

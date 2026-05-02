@@ -190,38 +190,47 @@ async def ensure_voice_connection(
     """
     from .playback import play_audio
 
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
     guild_id = interaction.guild.id
     state = get_guild_state(guild_id)
     music_player = state.music_player
     state = get_guild_state(guild_id)
     is_kawaii = state.locale == Locale.EN_X_KAWAII
 
+    # Try to get the member object through multiple methods
     member = None
+    
+    # Method 1: Direct interaction.member (most reliable for slash commands)
     if hasattr(interaction, "member") and interaction.member:
         member = interaction.member
         logger.debug(f"[{guild_id}] interaction.member -> {member}")
-
-    if not member and interaction.guild:
+    
+    # Method 2: Check if interaction.user is already a Member object
+    elif isinstance(interaction.user, discord.Member):
+        member = interaction.user
+        logger.debug(f"[{guild_id}] interaction.user is Member -> {member}")
+    
+    # Method 3: Get from guild cache
+    elif interaction.guild:
         member = interaction.guild.get_member(interaction.user.id)
         logger.debug(f"[{guild_id}] guild cache get_member -> {member}")
-
-    if not member and isinstance(interaction.user, discord.Member):
-        member = interaction.user
-        logger.debug(f"[{guild_id}] interaction.user -> {member}")
-
+    
+    # Method 4: Fetch from API (last resort)
     if not member and interaction.guild:
         try:
             member = await interaction.guild.fetch_member(interaction.user.id)
-            logger.debug(f"[{guild_id}] fetched member -> {member}")
+            logger.debug(f"[{guild_id}] fetched member from API -> {member}")
         except (discord.NotFound, discord.Forbidden):
+            logger.warning(f"[{guild_id}] Could not fetch member: NotFound or Forbidden")
             member = None
         except Exception as e:
-            logger.warning(
-                f"[{guild_id}] Could not fetch interaction member: {e}"
-            )
+            logger.warning(f"[{guild_id}] Could not fetch interaction member: {e}")
             member = None
 
-    voice_state = getattr(member, "voice", None)
+    # Get voice state from member
+    voice_state = getattr(member, "voice", None) if member else None
     if interaction.guild:
         guild_voice_states = getattr(interaction.guild, "voice_states", None)
         logger.debug(
@@ -234,40 +243,78 @@ async def ensure_voice_connection(
             )
 
     voice_channel = None
+    # Try to get voice channel from voice state first
     if voice_state and getattr(voice_state, "channel", None):
         voice_channel = voice_state.channel
+        logger.debug(f"[{guild_id}] Found voice channel from voice_state: {voice_channel.name}")
+    # Fallback: manually scan all voice channels if voice_state didn't work
     elif interaction.guild:
-        voice_channels = list(interaction.guild.voice_channels)
-        stage_channels = list(getattr(interaction.guild, "stage_channels", []))
-        all_voice_channels = voice_channels + stage_channels
-
-        if not all_voice_channels:
+        logger.info(f"[{guild_id}] voice_state.channel not found, scanning all voice channels for user {interaction.user.id}")
+        
+        # CRITICAL FIX: Fetch fresh guild data to ensure channels are populated
+        try:
+            # Fetch the guild with all its data to ensure channels are cached
+            fresh_guild = await bot.fetch_guild(interaction.guild.id, with_counts=False)
+            # Get all channels from the API
+            all_channels = await fresh_guild.fetch_channels()
+            
+            # Filter for voice and stage channels
             all_voice_channels = [
-                c
-                for c in interaction.guild.channels
+                c for c in all_channels
                 if c.type in (discord.ChannelType.voice, discord.ChannelType.stage_voice)
             ]
+            
             logger.info(
-                f"[{guild_id}] fallback scanning {len(all_voice_channels)} voice/stage channels by channel.type"
+                f"[{guild_id}] Fetched {len(all_channels)} total channels, {len(all_voice_channels)} voice/stage channels from API"
             )
-        else:
-            logger.info(
-                f"[{guild_id}] scanning {len(all_voice_channels)} guild voice/stage channels for user {interaction.user.id}"
-            )
+        except Exception as fetch_error:
+            logger.error(f"[{guild_id}] Failed to fetch channels from API: {fetch_error}")
+            # Fallback to cached channels if API fetch fails
+            voice_channels = list(interaction.guild.voice_channels)
+            stage_channels = list(getattr(interaction.guild, "stage_channels", []))
+            all_voice_channels = voice_channels + stage_channels
+            
+            # If still empty, try scanning cached channels by type
+            if not all_voice_channels:
+                all_voice_channels = [
+                    c
+                    for c in interaction.guild.channels
+                    if c.type in (discord.ChannelType.voice, discord.ChannelType.stage_voice)
+                ]
+                logger.info(
+                    f"[{guild_id}] Using cached channel scan, found {len(all_voice_channels)} voice/stage channels"
+                )
 
+        # Scan each channel's members list
         for channel in all_voice_channels:
-            logger.info(
-                f"[{guild_id}] channel={channel.name} type={channel.type} members={len(channel.members)}"
-            )
-            for member_in_voice in channel.members:
-                if member_in_voice.id == interaction.user.id:
-                    voice_channel = channel
-                    logger.info(
-                        f"[{guild_id}] found user in channel.members fallback -> {voice_channel}"
-                    )
+            # For fetched channels, we need to get the full channel object with members
+            try:
+                # Get the full channel object from the guild cache or fetch it
+                full_channel = interaction.guild.get_channel(channel.id)
+                if not full_channel:
+                    full_channel = await bot.fetch_channel(channel.id)
+                
+                logger.debug(
+                    f"[{guild_id}] Checking channel '{full_channel.name}' (type={full_channel.type}, members={len(full_channel.members) if hasattr(full_channel, 'members') else 'N/A'})"
+                )
+                
+                # Check if user is in this channel
+                if hasattr(full_channel, 'members'):
+                    for member_in_voice in full_channel.members:
+                        if member_in_voice.id == interaction.user.id:
+                            voice_channel = full_channel
+                            logger.info(
+                                f"[{guild_id}] ✓ Found user in voice channel '{voice_channel.name}' via member scan"
+                            )
+                            break
+                if voice_channel:
                     break
-            if voice_channel:
-                break
+            except Exception as channel_error:
+                logger.warning(f"[{guild_id}] Error checking channel {channel.id}: {channel_error}")
+                continue
+        
+        if not voice_channel:
+            logger.warning(f"[{guild_id}] User {interaction.user.id} not found in any voice channel after full scan")
 
     if not voice_channel:
         logger.info(
@@ -288,11 +335,18 @@ async def ensure_voice_connection(
         return None
 
     voice_channel = voice_channel
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
     vc = interaction.guild.voice_client
 
     # --- ZOMBIE DETECTION & STATE SYNC ---
     # Step 1: Handle cases where the voice client object is dead or stale.
-    if vc and not vc.is_connected():
+    if vc and not isinstance(vc, discord.VoiceClient):
+        logger.warning(f"[{guild_id}] Non-VoiceClient voice protocol detected. Resetting cached voice client.")
+        music_player.voice_client = None
+        vc = None
+    elif vc and not vc.is_connected():
         logger.warning(
             f"[{guild_id}] Stale/disconnected voice client detected. Forcing cleanup."
         )
@@ -367,7 +421,8 @@ async def ensure_voice_connection(
                 # Force disconnect the zombie client.
                 try:
                     music_player.is_cleaning = True
-                    await music_player.voice_client.disconnect(force=True)
+                    if music_player.voice_client:
+                        await music_player.voice_client.disconnect(force=True)
                     await asyncio.sleep(
                         1
                     )  # Crucial delay to let Discord process the disconnect.
@@ -409,11 +464,12 @@ async def ensure_voice_connection(
         await vc.move_to(voice_channel)
         await asyncio.sleep(0.5)
 
-    if isinstance(vc.channel, discord.StageChannel):
-        if interaction.guild.me.voice and interaction.guild.me.voice.suppress:
+    if vc.channel and isinstance(vc.channel, discord.StageChannel):
+        if interaction.guild and interaction.guild.me.voice and interaction.guild.me.voice.suppress:
             logger.info(f"[{guild_id}] Bot is a spectator. Attempting to promote.")
             try:
-                await interaction.guild.me.edit(suppress=False)
+                if interaction.guild:
+                    await interaction.guild.me.edit(suppress=False)
                 await asyncio.sleep(0.5)
             except discord.Forbidden:
                 logger.warning(

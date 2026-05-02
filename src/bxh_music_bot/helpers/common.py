@@ -5,6 +5,9 @@ from ..models.lazy_search import LazySearchItem
 
 async def show_youtube_blocked_message(interaction: discord.Interaction):
     """Creates and sends the standardized 'YouTube is blocked' embed."""
+    if not interaction.guild:
+        await interaction.followup.send("This command can only be used in a server.", ephemeral=True)
+        return
     guild_id = interaction.guild.id
     embed = Embed(
         title=get_messages("error.youtube_blocked.title", guild_id),
@@ -23,7 +26,7 @@ async def show_youtube_blocked_message(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed, ephemeral=True, silent=True)
 
 
-def get_track_display_info(track, guild_id: int = None) -> dict:
+def get_track_display_info(track, guild_id: Optional[int] = None) -> dict:
     """
     Normalizes access to a track's information, whether it's a LazySearchItem object
     or a dictionary. Always returns a clean and safe dictionary.
@@ -119,21 +122,21 @@ def create_progress_bar(
 
 
 # Make sure the parse_time function is also present
-def parse_time(time_str: str) -> int | None:
+def parse_time(time_str: str) -> Optional[int]:
     """Converts a time string (HH:MM:SS, MM:SS, SS) into seconds."""
     parts = time_str.split(":")
     if not all(part.isdigit() for part in parts):
         return None
 
-    parts = [int(p) for p in parts]
+    parts_int: list[int] = [int(p) for p in parts]
     seconds = 0
 
-    if len(parts) == 3:  # HH:MM:SS
-        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
-    elif len(parts) == 2:  # MM:SS
-        seconds = parts[0] * 60 + parts[1]
-    elif len(parts) == 1:  # SS
-        seconds = parts[0]
+    if len(parts_int) == 3:  # HH:MM:SS
+        seconds = parts_int[0] * 3600 + parts_int[1] * 60 + parts_int[2]
+    elif len(parts_int) == 2:  # MM:SS
+        seconds = parts_int[0] * 60 + parts_int[1]
+    elif len(parts_int) == 1:  # SS
+        seconds = parts_int[0]
     else:
         return None
 
@@ -158,7 +161,7 @@ async def safe_stop(vc: discord.VoiceClient):
         # PCMVolumeTransformer wraps FFmpegPCMAudio in `original`, so unwrap first.
         source = vc.source
         while hasattr(source, "original"):
-            source = source.original
+            source = source.original  # type: ignore[union-attr]
 
         process = getattr(source, "_process", None) or getattr(source, "process", None)
         if process and process.poll() is None:

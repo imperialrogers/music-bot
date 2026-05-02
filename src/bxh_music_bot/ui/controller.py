@@ -10,7 +10,7 @@ class AddSongModal(discord.ui.Modal):
         super().__init__(title=get_messages("controller.label.add_song", guild_id))
         self.bot = bot
         self.guild_id = guild_id
-        self.query_input = discord.ui.TextInput(
+        self.query_input: discord.ui.TextInput = discord.ui.TextInput(
             label=get_messages("add_song_modal.label", self.guild_id),
             placeholder=get_messages("add_song_modal.placeholder", self.guild_id),
             style=discord.TextStyle.short,
@@ -69,7 +69,7 @@ class JumpToSelect(discord.ui.Select):
         selected_index = int(self.values[0])
 
         async with music_player.queue_lock:
-            queue_list = list(music_player.queue._queue)
+            queue_list = music_player.get_queue_items()
             if not 0 <= selected_index < len(queue_list):
                 return await interaction.response.defer()
 
@@ -81,7 +81,7 @@ class JumpToSelect(discord.ui.Select):
 
             new_queue_list = queue_list[selected_index:]
 
-            new_queue = asyncio.Queue()
+            new_queue: asyncio.Queue[Any] = asyncio.Queue()
             for item in new_queue_list:
                 await new_queue.put(item)
             music_player.queue = new_queue
@@ -147,12 +147,12 @@ class JumpToView(View):
         )
 
         if self.total_pages > 1:
-            prev_button = Button(
+            prev_button: Button = Button(
                 label=get_messages("queue_button.previous", self.guild_id),
                 style=ButtonStyle.secondary,
                 disabled=(self.current_page == 0),
             )
-            next_button = Button(
+            next_button: Button = Button(
                 label=get_messages("queue_button.next", self.guild_id),
                 style=ButtonStyle.secondary,
                 disabled=(self.current_page >= self.total_pages - 1),
@@ -299,7 +299,11 @@ class MusicControllerView(View):
         music_player = get_player(interaction.guild_id)
         guild_id = interaction.guild_id
         vc = interaction.guild.voice_client
-        if not vc or not (vc.is_playing() or vc.is_paused()):
+        if (
+            not vc
+            or not isinstance(vc, discord.VoiceClient)
+            or not (vc.is_playing() or vc.is_paused())
+        ):
             return await interaction.response.defer()
         if music_player.loop_current:
             music_player.is_seeking, music_player.seek_info = True, 0
@@ -328,7 +332,7 @@ class MusicControllerView(View):
         ]
         queue_before = [
             get_track_display_info(item).get("title", "N/A")
-            for item in list(music_player.queue._queue)
+            for item in music_player.get_queue_items()
         ]
         current_song_title = (
             get_track_display_info(music_player.current_info).get("title", "N/A")
@@ -350,7 +354,7 @@ class MusicControllerView(View):
                     silent=True,
                 )
 
-            rest_of_queue = list(music_player.queue._queue)
+            rest_of_queue = music_player.get_queue_items()
             logger.info(
                 f"[DEBUG-PREVIOUS] Copied 'rest_of_queue' (size {len(rest_of_queue)})"
             )
@@ -377,7 +381,7 @@ class MusicControllerView(View):
                 f"[DEBUG-PREVIOUS] Reconstructed 'new_queue_items' (new size should be {len(rest_of_queue) + 2})"
             )
 
-            new_queue = asyncio.Queue()
+            new_queue: asyncio.Queue[Any] = asyncio.Queue()
             for item in new_queue_items:
                 await new_queue.put(item)
 
@@ -401,7 +405,11 @@ class MusicControllerView(View):
     async def pause_button(self, interaction: discord.Interaction, button: Button):
         music_player = get_player(interaction.guild_id)
         vc = music_player.voice_client
-        if not vc or not (vc.is_playing() or vc.is_paused()):
+        if (
+            not vc
+            or not isinstance(vc, discord.VoiceClient)
+            or not (vc.is_playing() or vc.is_paused())
+        ):
             return await interaction.response.defer()
         if vc.is_paused():
             vc.resume()
@@ -422,7 +430,11 @@ class MusicControllerView(View):
         music_player = get_player(interaction.guild_id)
         vc = music_player.voice_client
 
-        if not vc or not (vc.is_playing() or vc.is_paused()):
+        if (
+            not vc
+            or not isinstance(vc, discord.VoiceClient)
+            or not (vc.is_playing() or vc.is_paused())
+        ):
             return await interaction.response.defer()
 
         if music_player.lyrics_task and not music_player.lyrics_task.done():
@@ -449,7 +461,7 @@ class MusicControllerView(View):
             music_player.lyrics_task.cancel()
 
         vc = music_player.voice_client
-        if vc and vc.is_connected():
+        if vc and isinstance(vc, discord.VoiceClient) and vc.is_connected():
             # Stop playback and kill FFmpeg
             await safe_stop(vc)
 
@@ -490,9 +502,9 @@ class MusicControllerView(View):
                     ephemeral=True,
                     silent=True,
                 )
-            queue_list = list(music_player.queue._queue)
+            queue_list = music_player.get_queue_items()
             random.shuffle(queue_list)
-            new_queue = asyncio.Queue()
+            new_queue: asyncio.Queue[Any] = asyncio.Queue()
             for item in queue_list:
                 await new_queue.put(item)
             music_player.queue = new_queue
@@ -527,7 +539,12 @@ class MusicControllerView(View):
         )
         new_volume = max(0, music_player.volume - 0.1)
         music_player.volume = new_volume
-        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+        if (
+            vc
+            and isinstance(vc, discord.VoiceClient)
+            and vc.source
+            and isinstance(vc.source, discord.PCMVolumeTransformer)
+        ):
             vc.source.volume = new_volume
         await update_controller(self.bot, interaction.guild_id)
         await interaction.response.defer()
@@ -542,7 +559,12 @@ class MusicControllerView(View):
         )
         new_volume = min(2.0, music_player.volume + 0.1)
         music_player.volume = new_volume
-        if vc and vc.source and isinstance(vc.source, discord.PCMVolumeTransformer):
+        if (
+            vc
+            and isinstance(vc, discord.VoiceClient)
+            and vc.source
+            and isinstance(vc.source, discord.PCMVolumeTransformer)
+        ):
             vc.source.volume = new_volume
         await update_controller(self.bot, interaction.guild_id)
         await interaction.response.defer()
@@ -669,7 +691,7 @@ async def create_controller_embed(bot, guild_id):
     music_player = state.music_player
     is_kawaii = state.locale == Locale.EN_X_KAWAII
     vc = music_player.voice_client
-    is_connected = vc and vc.is_connected()
+    is_connected = bool(vc and isinstance(vc, discord.VoiceClient) and vc.is_connected())
     is_playing = is_connected and music_player.current_info
 
     if not is_playing:
@@ -714,9 +736,9 @@ async def create_controller_embed(bot, guild_id):
                 + music_player.radio_playlist[:current_index]
             )
         except (ValueError, IndexError):
-            queue_snapshot = list(music_player.queue._queue)
+            queue_snapshot = music_player.get_queue_items()
     else:
-        queue_snapshot = list(music_player.queue._queue)
+        queue_snapshot = music_player.get_queue_items()
 
     tracks_to_display = queue_snapshot[:5]
 

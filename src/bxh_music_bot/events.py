@@ -5,11 +5,12 @@ from .helpers.common import *
 from .services.playback import play_audio
 from .services.voice import clear_audio_cache, play_silence_loop, safe_stop
 from .ui.controller import MusicControllerView
+from .logging_handler import setup_discord_logging, add_memory_tracking_to_logger
 
 @bot.event
 async def on_message(message: discord.Message):
     # Ignore messages from the bot itself to prevent loops
-    if message.author == bot.user:
+    if bot.user and message.author == bot.user:
         return
 
     # Ignore messages outside of guilds (DMs)
@@ -41,7 +42,7 @@ async def on_voice_state_update(member, before, after):
     guild_id = guild.id
 
     # --- BOT DISCONNECTION LOGIC (Critical Cleanup) ---
-    if member.id == bot.user.id and after.channel is None:
+    if bot.user and member.id == bot.user.id and after.channel is None:
         if music_player.is_reconnecting or music_player.is_cleaning:
             return
 
@@ -124,7 +125,7 @@ async def on_voice_state_update(member, before, after):
             )
 
             if music_player.current_info:
-                if was_playing_silence:
+                if was_playing_silence and music_player.silence_task:
                     music_player.silence_task.cancel()
                     music_player.is_resuming_after_silence = True
                     if vc.is_playing():
@@ -181,10 +182,11 @@ async def global_interaction_check(interaction: discord.Interaction) -> bool:
     state = get_guild_state(guild_id)
     is_kawaii = state.locale == Locale.EN_X_KAWAII
     channel_mentions = ", ".join([f"<#{ch_id}>" for ch_id in allowed_ids])
+    bot_name = interaction.client.user.name if interaction.client.user else "Bot"
     description_text = get_messages(
         "command.restricted_description",
         guild_id,
-        bot_name=interaction.client.user.name,
+        bot_name=bot_name,
     )
 
     embed = discord.Embed(
@@ -234,8 +236,22 @@ async def on_global_app_command_error(
 
 @bot.event
 async def on_ready():
+    if not bot.user:
+        logger.error("Bot user is None in on_ready event")
+        return
     logger.info(f"{bot.user.name} is online.")
     try:
+        # Initialize Discord logging with memory tracking and monitoring
+        discord_handler, memory_monitor = await setup_discord_logging(bot, logger)
+        if discord_handler:
+            logger.info("Discord logging handler initialized successfully")
+        if memory_monitor:
+            logger.info("Memory monitoring started successfully")
+        
+        # Add memory tracking to console logger
+        add_memory_tracking_to_logger(logger)
+        logger.info("Memory tracking added to console logger")
+        
         bot.tree.interaction_check = global_interaction_check
         logger.info("Global interaction check has been manually assigned.")
 

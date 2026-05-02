@@ -16,7 +16,7 @@ from ..ui.interactions import *
 async def lyrics(interaction: discord.Interaction):
     if not interaction.guild:
         await interaction.response.send_message(
-            get_messages("command.error.guild_only", interaction.guild_id),
+            "This command can only be used in a server.",
             ephemeral=True,
             silent=SILENT_MESSAGES,
         )
@@ -218,7 +218,7 @@ async def play_autocomplete(
         )
 
         choices = []
-        if "entries" in info and info["entries"]:
+        if info and isinstance(info, dict) and "entries" in info and info["entries"]:
             for entry in info.get("entries", [])[:3]:  # 🔧 Limiter à 3 choix max
                 title = entry.get("title", "Unknown Title")
                 url = entry.get("webpage_url", entry.get("url"))
@@ -292,7 +292,9 @@ async def play(interaction: discord.Interaction, query: str):
         await music_player.queue.put(queue_item)
         await update_controller(bot, guild_id, interaction=interaction)
         if (
-            not music_player.voice_client.is_playing()
+            music_player.voice_client
+            and isinstance(music_player.voice_client, discord.VoiceClient)
+            and not music_player.voice_client.is_playing()
             and not music_player.voice_client.is_paused()
         ):
             music_player.current_task = asyncio.create_task(play_audio(guild_id))
@@ -335,7 +337,9 @@ async def play(interaction: discord.Interaction, query: str):
         await interaction.followup.send(silent=SILENT_MESSAGES, embed=embed)
 
         if (
-            not music_player.voice_client.is_playing()
+            music_player.voice_client
+            and isinstance(music_player.voice_client, discord.VoiceClient)
+            and not music_player.voice_client.is_playing()
             and not music_player.voice_client.is_paused()
         ):
             music_player.current_task = asyncio.create_task(play_audio(guild_id))
@@ -391,8 +395,16 @@ async def play(interaction: discord.Interaction, query: str):
                         f"{search_prefix}{sanitize_query(search_term)}",
                         ydl_opts_override={"noplaylist": True},
                     )
-                    video = info["entries"][0]
-                    await add_and_update_controller(video)
+                    if info and isinstance(info, dict) and "entries" in info and info["entries"]:
+                        video = info["entries"][0]
+                        await add_and_update_controller(video)
+                    else:
+                        logger.error(f"Failed to fetch video info for: {search_term}")
+                        await interaction.followup.send(
+                            get_messages("player.error.fetch_failed", guild_id),
+                            ephemeral=True,
+                            silent=SILENT_MESSAGES,
+                        )
                 else:
                     # Gestion d'une playlist complète
                     await handle_platform_playlist(platform_tracks, platform_name)
@@ -404,7 +416,7 @@ async def play(interaction: discord.Interaction, query: str):
                 query, ydl_opts_override={"extract_flat": True, "noplaylist": False}
             )
 
-            if "entries" in info and len(info["entries"]) > 1:
+            if info and isinstance(info, dict) and "entries" in info and len(info["entries"]) > 1:
                 # C'est une playlist, on ajoute chaque URL dans un dictionnaire simple.
                 tracks_to_add = info["entries"]
                 logger.info(
@@ -435,7 +447,8 @@ async def play(interaction: discord.Interaction, query: str):
                 await interaction.followup.send(embed=embed, silent=SILENT_MESSAGES)
 
                 if (
-                    not music_player.voice_client.is_playing()
+                    music_player.voice_client
+                    and not music_player.voice_client.is_playing()
                     and not music_player.voice_client.is_paused()
                 ):
                     music_player.current_task = asyncio.create_task(
@@ -483,15 +496,15 @@ async def play(interaction: discord.Interaction, query: str):
 async def play_files(
     interaction: discord.Interaction,
     file1: discord.Attachment,
-    file2: discord.Attachment = None,
-    file3: discord.Attachment = None,
-    file4: discord.Attachment = None,
-    file5: discord.Attachment = None,
-    file6: discord.Attachment = None,
-    file7: discord.Attachment = None,
-    file8: discord.Attachment = None,
-    file9: discord.Attachment = None,
-    file10: discord.Attachment = None,
+    file2: Optional[discord.Attachment] = None,
+    file3: Optional[discord.Attachment] = None,
+    file4: Optional[discord.Attachment] = None,
+    file5: Optional[discord.Attachment] = None,
+    file6: Optional[discord.Attachment] = None,
+    file7: Optional[discord.Attachment] = None,
+    file8: Optional[discord.Attachment] = None,
+    file9: Optional[discord.Attachment] = None,
+    file10: Optional[discord.Attachment] = None,
 ):
     """
     Downloads, saves, and queues one or more user-uploaded audio/video files.
@@ -603,7 +616,9 @@ async def play_files(
     await interaction.followup.send(embed=embed, silent=SILENT_MESSAGES)
 
     if (
-        not music_player.voice_client.is_playing()
+        music_player.voice_client
+        and isinstance(music_player.voice_client, discord.VoiceClient)
+        and not music_player.voice_client.is_playing()
         and not music_player.voice_client.is_paused()
     ):
         music_player.current_task = asyncio.create_task(play_audio(guild_id))
@@ -647,7 +662,7 @@ async def queue(interaction: discord.Interaction):
         except (ValueError, IndexError):
             tracks_for_display = music_player.radio_playlist
     else:
-        tracks_for_display = list(music_player.queue._queue)
+        tracks_for_display = music_player.get_queue_items()
 
     if not tracks_for_display and not music_player.current_info:
         state = get_guild_state(guild_id)
@@ -711,7 +726,7 @@ async def clear_queue(interaction: discord.Interaction):
     file="The local audio/video file to play next.",
 )
 async def play_next(
-    interaction: discord.Interaction, query: str = None, file: discord.Attachment = None
+    interaction: discord.Interaction, query: Optional[str] = None, file: Optional[discord.Attachment] = None
 ):
     if not interaction.guild:
         await interaction.response.send_message(
@@ -950,7 +965,8 @@ async def play_next(
         bot.loop.create_task(update_controller(bot, guild_id))
 
         if (
-            not music_player.voice_client.is_playing()
+            music_player.voice_client
+            and not music_player.voice_client.is_playing()
             and not music_player.voice_client.is_paused()
         ):
             music_player.current_task = asyncio.create_task(play_audio(guild_id))
@@ -1150,7 +1166,7 @@ async def skip_autocomplete(
     choices = []
 
     # Get a snapshot of the queue to work with
-    tracks = list(music_player.queue._queue)
+    tracks = music_player.get_queue_items()
 
     # We only show up to 25 choices, which is Discord's limit
     for i, track in enumerate(tracks[:25]):
@@ -1203,7 +1219,11 @@ async def skip(
     music_player = state.music_player
     voice_client = interaction.guild.voice_client
 
-    if not voice_client or not (voice_client.is_playing() or voice_client.is_paused()):
+    if (
+        not voice_client
+        or not isinstance(voice_client, discord.VoiceClient)
+        or not (voice_client.is_playing() or voice_client.is_paused())
+    ):
         embed = Embed(
             description=get_messages("player.no_song.title", guild_id),
             color=0xFF9AA2 if is_kawaii else discord.Color.red(),
@@ -1238,7 +1258,7 @@ async def skip(
             # Convert to 0-based index
             index_to_jump_to = number - 1
 
-            queue_list = list(music_player.queue._queue)
+            queue_list = music_player.get_queue_items()
 
             # Add the tracks that are being skipped to the history
             tracks_to_skip = queue_list[:index_to_jump_to]
@@ -1248,7 +1268,7 @@ async def skip(
             new_queue_list = queue_list[index_to_jump_to:]
 
             # Rebuild the queue
-            new_queue = asyncio.Queue()
+            new_queue: asyncio.Queue[Any] = asyncio.Queue()
             for item in new_queue_list:
                 await new_queue.put(item)
             music_player.queue = new_queue
@@ -1294,7 +1314,7 @@ async def skip(
         return
 
     # Announcing the next song in queue
-    queue_snapshot = list(music_player.queue._queue)
+    queue_snapshot = music_player.get_queue_items()
     next_song_info = queue_snapshot[0] if queue_snapshot else None
 
     embed = None
@@ -1580,7 +1600,8 @@ async def status(interaction: discord.Interaction):
         description=get_messages("status.description", guild_id),
         color=0x2ECC71 if latency < 200 else (0xE67E22 if latency < 500 else 0xE74C3C),
     )
-    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    if bot.user:
+        embed.set_thumbnail(url=bot.user.display_avatar.url)
 
     embed.add_field(
         name=get_messages("status.bot.title", guild_id),
@@ -1653,9 +1674,9 @@ async def status(interaction: discord.Interaction):
 
 
 @bot.tree.command(
-    name="support", description="Shows ways to support the creator of bxh-music-bot."
+    name="bxh", description="Shows ways to support the creator of bxh-music-bot."
 )
-async def support(interaction: discord.Interaction):
+async def bxh(interaction: discord.Interaction):
     if not interaction.guild:
         await interaction.response.send_message(
             get_messages("support.guild_agnostic", interaction.guild_id),
@@ -1677,19 +1698,19 @@ async def support(interaction: discord.Interaction):
         ),  # Gold for normal, Pink for kawaii
     )
 
-    patreon_link = "https://patreon.com/bxh-music-bot"
-    paypal_link = "https://www.paypal.com/paypalme/alanmussot1"
+    youtube_link = "https://youtube.com/playlist?list=PLQVmleTptasE3be7K3OIBkWUKQn5J61qX&si=3f5ewua5UGHmr2-z"
+    spotify_link = "https://open.spotify.com/playlist/1sWBejeQtbPrC0vuxgOJc6?si=s1KRceFaTxKspRxYfbxyMw"
     discord_server_link = "https://discord.gg/JeH8g6g3cG"
-    discord_username = "@alananasssss"
+    discord_username = "@bloodxhonor"
 
     embed.add_field(
-        name=get_messages("support.patreon_title", guild_id),
-        value=get_messages("support.patreon_value", guild_id, link=patreon_link),
+        name=get_messages("support.youtube_title", guild_id),
+        value=get_messages("support.youtube_value", guild_id, link=youtube_link),
         inline=True,
     )
     embed.add_field(
-        name=get_messages("support.paypal_title", guild_id),
-        value=get_messages("support.paypal_value", guild_id, link=paypal_link),
+        name=get_messages("support.spotify_title", guild_id),
+        value=get_messages("support.spotify_value", guild_id, link=spotify_link),
         inline=True,
     )
 
@@ -1709,7 +1730,8 @@ async def support(interaction: discord.Interaction):
         inline=True,
     )
 
-    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    if bot.user:
+        embed.set_thumbnail(url=bot.user.display_avatar.url)
     embed.set_footer(text=get_messages("support.footer", guild_id))
 
     await interaction.response.send_message(embed=embed, silent=SILENT_MESSAGES)
@@ -1791,7 +1813,7 @@ async def radio_24_7(interaction: discord.Interaction, mode: str):
                 }
             )
 
-        queue_snapshot = list(music_player.queue._queue)
+        queue_snapshot = music_player.get_queue_items()
         music_player.radio_playlist.extend(queue_snapshot)
 
     if not music_player.radio_playlist and mode == "normal":
@@ -1821,7 +1843,9 @@ async def radio_24_7(interaction: discord.Interaction, mode: str):
         )
 
     if (
-        not music_player.voice_client.is_playing()
+        music_player.voice_client
+        and isinstance(music_player.voice_client, discord.VoiceClient)
+        and not music_player.voice_client.is_playing()
         and not music_player.voice_client.is_paused()
     ):
         music_player.current_task = asyncio.create_task(play_audio(guild_id))
@@ -1904,7 +1928,7 @@ async def reconnect(interaction: discord.Interaction):
         await asyncio.sleep(0.75)  # A small delay to ensure clean disconnection
 
         # Reconnect to the same channel
-        new_vc = await current_voice_channel.connect()
+        new_vc: discord.VoiceClient = await current_voice_channel.connect()
         music_player.voice_client = new_vc
 
         if isinstance(current_voice_channel, discord.StageChannel):
@@ -1950,13 +1974,15 @@ async def reconnect(interaction: discord.Interaction):
 async def song_autocomplete(
     interaction: discord.Interaction, current: str
 ) -> list[app_commands.Choice[str]]:
+    if not interaction.guild:
+        return []
     guild_id = interaction.guild.id
     state = get_guild_state(guild_id)
     music_player = state.music_player
     choices = []
 
     # Get a snapshot of the queue to work with
-    tracks = list(music_player.queue._queue)
+    tracks = music_player.get_queue_items()
 
     # Iterate through the queue and create a choice for each song
     for i, track in enumerate(tracks):
@@ -2014,7 +2040,7 @@ async def remove(interaction: discord.Interaction):
 
     await interaction.response.defer()
 
-    all_tracks = list(music_player.queue._queue)
+    all_tracks = music_player.get_queue_items()
     view = RemoveView(interaction, all_tracks)
     await view.update_view()
 
@@ -2036,7 +2062,7 @@ async def remove(interaction: discord.Interaction):
 async def search(interaction: discord.Interaction, query: str):
     if not interaction.guild:
         await interaction.response.send_message(
-            get_messages("command.error.guild_only", interaction.guild.id),
+            "This command can only be used in a server.",
             ephemeral=True,
             silent=SILENT_MESSAGES,
         )
@@ -2097,6 +2123,9 @@ async def search(interaction: discord.Interaction, query: str):
     description="Opens an interactive menu to seek, fast-forward, or rewind.",
 )
 async def seek_interactive(interaction: discord.Interaction):
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
     guild_id = interaction.guild.id
     state = get_guild_state(guild_id)
     music_player = state.music_player
@@ -2165,6 +2194,9 @@ async def volume(
         )
         return
 
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
     guild_id = interaction.guild.id
     state = get_guild_state(guild_id)
     music_player = state.music_player
@@ -2173,7 +2205,12 @@ async def volume(
     new_volume = level / 100.0
     music_player.volume = new_volume
 
-    if vc and vc.is_playing() and isinstance(vc.source, discord.PCMVolumeTransformer):
+    if (
+        vc
+        and isinstance(vc, discord.VoiceClient)
+        and vc.is_playing()
+        and isinstance(vc.source, discord.PCMVolumeTransformer)
+    ):
         vc.source.volume = new_volume
 
     embed = Embed(
@@ -2193,12 +2230,19 @@ async def volume(
     name="previous", description="Plays the previous song in the history."
 )
 async def previous(interaction: discord.Interaction):
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return
     guild_id = interaction.guild.id
     state = get_guild_state(guild_id)
     music_player = state.music_player
     vc = interaction.guild.voice_client  # Use the guild's voice_client directly
 
-    if not vc or not (vc.is_playing() or vc.is_paused()):
+    if (
+        not vc
+        or not isinstance(vc, discord.VoiceClient)
+        or not (vc.is_playing() or vc.is_paused())
+    ):
         await interaction.response.send_message(
             get_messages("player.no_playback.title", guild_id),
             ephemeral=True,
@@ -2223,11 +2267,11 @@ async def previous(interaction: discord.Interaction):
     previous_song = music_player.history.pop()
 
     # Rebuild the queue
-    new_queue = asyncio.Queue()
+    new_queue: asyncio.Queue[Any] = asyncio.Queue()
     await new_queue.put(previous_song)
     await new_queue.put(current_song)
 
-    old_queue_list = list(music_player.queue._queue)
+    old_queue_list = music_player.get_queue_items()
     for item in old_queue_list:
         await new_queue.put(item)
 
@@ -2276,7 +2320,7 @@ async def jumpto(interaction: discord.Interaction):
 
     await interaction.response.defer()
 
-    all_tracks = list(music_player.queue._queue)
+    all_tracks = music_player.get_queue_items()
     view = JumpToView(interaction, all_tracks)
     await view.update_view()
 

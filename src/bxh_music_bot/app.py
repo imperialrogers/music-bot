@@ -12,6 +12,7 @@ from .services.lyrics import *
 from .services.platforms import *
 from .commands.music import *
 from .commands.admin import *
+from .health_server import run_health_server
 
 if bot.tree.get_command("setup") is None:
     bot.tree.add_command(SetupCommands(bot))
@@ -21,4 +22,8 @@ from .events import *
 def run():
     init_db()
     bot.start_time = time.time()
+    
+    # Start health check server for Render/hosting platforms
+    run_health_server(bot_start_time=bot.start_time)
+    
     bot.run(os.getenv("DISCORD_TOKEN"))

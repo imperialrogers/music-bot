@@ -1,7 +1,8 @@
-import yaml
+import yaml  # type: ignore[import-untyped]
 import re
 import pathlib
 from enum import Enum
+from typing import Any, Optional
 
 # Define a simple Enum for supported locales
 class Locale(Enum):
@@ -95,7 +96,7 @@ class I18nTranslator:
         if not self.__default_locale.value in self.__translations:
             raise ValueError(f"Default locale '{self.__default_locale.value}' not found in translations.")
 
-    def translate(self, key, locale=None, **kwargs) -> str:
+    def translate(self, key: str, locale: Optional[Locale | str] = None, **kwargs: Any) -> str:
         """
         Translate a key using the loaded translations.
         This version correctly handles locale as a string or an Enum
@@ -139,7 +140,7 @@ class I18nTranslator:
 
         # 5. If still not found, return the raw key
         if value is None:
-            return key
+            return key  # type: ignore[return-value]
 
         # 6. If found, format the string with variables and return it
         if isinstance(value, str):
@@ -156,9 +157,9 @@ class I18nTranslator:
             return value
 
         # If the key points to a dictionary, not a string, return the key
-        return key
+        return key  # type: ignore[return-value]
 
-    def t(self, key, locale=None, **kwargs) -> str:
+    def t(self, key: str, locale: Optional[Locale | str] = None, **kwargs: Any) -> str:
         """
         Short alias for translate method.
         Translate a key using the loaded translations.

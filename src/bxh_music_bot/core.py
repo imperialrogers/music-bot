@@ -23,16 +23,16 @@ import random
 from urllib.parse import urlparse, parse_qs, quote_plus
 from cachetools import TTLCache
 import logging
-import requests
+import requests  # type: ignore[import-untyped]
 from playwright.async_api import async_playwright
 from concurrent.futures import ProcessPoolExecutor
 from src.i18n_translator import I18nTranslator, Locale
-from typing import Optional
+from typing import Optional, Any
 import json
 import time
-import syncedlyrics
-import lyricsgenius
-import psutil
+import syncedlyrics  # type: ignore[import-untyped]
+import lyricsgenius  # type: ignore[import-untyped]
+import psutil  # type: ignore[import-untyped]
 import time
 import datetime
 import platform
@@ -138,9 +138,43 @@ if process_pool is None and process_pool_init_error is not None:
 
 GENIUS_TOKEN = os.getenv("GENIUS_TOKEN")
 
+def validate_genius_token():
+    """Validate the Genius API token by making a test request."""
+    if not genius:
+        return False
+    
+    try:
+        # Make a simple test request to validate the token
+        test_result = genius.search_songs("test", per_page=1)
+        logger.info("Genius API token validated successfully.")
+        return True
+    except AssertionError as e:
+        error_msg = str(e)
+        if "401" in error_msg or "invalid_token" in error_msg.lower():
+            logger.error(
+                "Genius API token validation failed: Invalid or expired token. "
+                "Lyrics functionality will be disabled. Please update GENIUS_TOKEN in .env file."
+            )
+            return False
+        else:
+            logger.warning(f"Genius API token validation encountered an error: {e}")
+            return False
+    except Exception as e:
+        logger.warning(f"Could not validate Genius API token: {e}")
+        # Don't fail completely on validation errors, allow the bot to try later
+        return True
+
 if GENIUS_TOKEN and GENIUS_TOKEN != "YOUR_GENIUS_TOKEN_HERE":
-    genius = lyricsgenius.Genius(GENIUS_TOKEN, remove_section_headers=True)
-    logger.info("LyricsGenius client initialized.")
+    try:
+        genius = lyricsgenius.Genius(GENIUS_TOKEN, remove_section_headers=True)
+        logger.info("LyricsGenius client initialized.")
+        # Validate token on startup (non-blocking)
+        if not validate_genius_token():
+            genius = None
+            logger.warning("Genius API token is invalid. Lyrics functionality disabled.")
+    except Exception as e:
+        genius = None
+        logger.error(f"Failed to initialize LyricsGenius client: {e}")
 else:
     genius = None
     logger.warning(
@@ -168,12 +202,12 @@ try:
     spotify_scraper_client = SpotifyClient(browser_type="requests")
     logger.info("SpotifyScraper client successfully initialized in requests mode.")
 except Exception as e:
-    spotify_scraper_client = None
+    spotify_scraper_client: Optional[SpotifyClient] = None
     logger.error(f"Could not initialize SpotifyScraper: {e}")
 
 # --- Caching ---
 
-url_cache = TTLCache(maxsize=75000, ttl=7200)
+url_cache: TTLCache[Any, Any] = TTLCache(maxsize=75000, ttl=7200)
 
 translator = I18nTranslator(
     default_locale=Locale.EN_US, translations_dir=str(I18N_DIR)
@@ -229,6 +263,7 @@ intents.message_content = True
 class BxhMusicBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.start_time: float = 0.0
 
     # Override the close() method to add our save logic
     async def close(self):
@@ -263,8 +298,8 @@ bot = BxhMusicBot(
 class MusicPlayer:
     def __init__(self):
         self.voice_client = None
-        self.current_task = None
-        self.queue = asyncio.Queue()
+        self.current_task: asyncio.Task[None] | None = None
+        self.queue: asyncio.Queue[Any] = asyncio.Queue()
         self.history = []
         self.radio_playlist = []
         self.current_url = None
@@ -279,7 +314,7 @@ class MusicPlayer:
         self.seek_info = None
 
         # --- Attributes for lyrics, karaoke, and filters ---
-        self.lyrics_task = None
+        self.lyrics_task: asyncio.Task[None] | None = None
         self.lyrics_message = None
         self.synced_lyrics = None
         self.is_seeking = False
@@ -288,7 +323,7 @@ class MusicPlayer:
         self.is_reconnecting = False
         self.is_current_live = False
 
-        self.hydration_task = None
+        self.hydration_task: asyncio.Task[None] | None = None
         self.hydration_lock = asyncio.Lock()
 
         self.suppress_next_now_playing = False
@@ -296,9 +331,9 @@ class MusicPlayer:
         self.is_auto_promoting = False
         self.is_cleaning = False
         self.is_resuming_after_clean = False
-        self.resume_info = None
+        self.resume_info: Optional[dict[str, Any]] = None
         self.is_resuming_live = False
-        self.silence_task = None
+        self.silence_task: asyncio.Task[None] | None = None
         self.is_playing_silence = False
         self.is_resuming_after_silence = False
         self.volume = 1.0
@@ -308,6 +343,10 @@ class MusicPlayer:
         self.silence_management_lock = asyncio.Lock()
         self.is_paused_by_leave = False
         self.manual_stop = False
+
+    def get_queue_items(self) -> list[Any]:
+        """Get a copy of queued items without mutating the queue."""
+        return list(self.queue._queue)  # type: ignore[attr-defined]
 
     async def hydrate_track_info(self, track_info: dict) -> dict:
         """
@@ -321,7 +360,11 @@ class MusicPlayer:
         if isinstance(track_info, LazySearchItem):
             if not track_info.resolved_info:
                 await track_info.resolve()
-            return track_info.resolved_info or {
+            # Ensure we return a dict even if resolved_info is None or invalid
+            resolved = track_info.resolved_info
+            if isinstance(resolved, dict):
+                return resolved
+            return {
                 "title": "Resolution Failed",
                 "url": "#",
             }
@@ -338,8 +381,9 @@ class MusicPlayer:
                 url_to_fetch = track_info.get("url")
                 if url_to_fetch:
                     full_info = await fetch_video_info_with_retry(url_to_fetch)
-                    # Update the original dict with new info
-                    track_info.update(full_info)
+                    # Update the original dict with new info only if full_info is a valid dict
+                    if isinstance(full_info, dict):
+                        track_info.update(full_info)
                     return track_info
             except Exception as e:
                 logger.error(
@@ -385,6 +429,46 @@ def get_mode(guild_id: int) -> bool:
     """Helper to quickly check if kawaii_mode is active for a guild."""
     # This now checks the locale set in the guild's state.
     return get_guild_state(guild_id).locale == Locale.EN_X_KAWAII
+
+
+def cleanup_old_data(guild_id: int):
+    """
+    Clean up old queue and history items to prevent memory bloat.
+    
+    GC Safety for 24/7 Operation:
+    - Called after each song completion to prevent memory accumulation
+    - Uses generation 0 GC (quick, ~1-5ms) when cleanup occurs
+    - Non-blocking and safe during active playback
+    - Prevents memory from growing unbounded during long sessions
+    
+    Memory Management Strategy:
+    - History limited to 100 items (configurable via MAX_HISTORY_SIZE)
+    - Queue size monitored (warning at 50+ items via MAX_QUEUE_SIZE)
+    - Old items removed automatically to maintain performance
+    - Generation 0 GC cleans up freed objects without blocking
+    """
+    import gc
+    
+    music_player = get_player(guild_id)
+    max_queue_size = int(os.getenv("MAX_QUEUE_SIZE", "50"))
+    max_history_size = int(os.getenv("MAX_HISTORY_SIZE", "100"))
+    
+    # Limit history size
+    if len(music_player.history) > max_history_size:
+        removed = len(music_player.history) - max_history_size
+        music_player.history = music_player.history[-max_history_size:]
+        logger.info(f"[{guild_id}] Trimmed {removed} old history items to save memory")
+        # Quick GC to clean up removed items - safe during playback
+        gc.collect(generation=0)
+    
+    # Check queue size (note: asyncio.Queue doesn't have direct size limit)
+    # This is more of a warning system
+    queue_size = music_player.queue.qsize()
+    if queue_size > max_queue_size:
+        logger.warning(
+            f"[{guild_id}] Queue size ({queue_size}) exceeds recommended limit ({max_queue_size}). "
+            "Consider clearing some items to reduce memory usage."
+        )
 
 
 # --- Core Music Player Class ---
@@ -436,7 +520,7 @@ async def save_all_states():
             guild_id,
             player.voice_client.channel.id,
             json.dumps(player.current_info) if player.current_info else None,
-            json.dumps(list(player.queue._queue)) if not player.queue.empty() else None,
+            json.dumps(player.get_queue_items()) if not player.queue.empty() else None,
             json.dumps(player.history),
             json.dumps(player.radio_playlist),
             player.loop_current,

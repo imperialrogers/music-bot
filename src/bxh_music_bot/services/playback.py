@@ -6,9 +6,10 @@ from ..helpers.url_utils import *
 from ..models.lazy_search import LazySearchItem
 from ..services.voice import fetch_video_info_with_retry, run_ydl_with_low_priority
 from ..ui.controller import update_controller
+import gc
 
 
-async def handle_playback_error(guild_id: int, error: Exception, query_url: str = None):
+async def handle_playback_error(guild_id: int, error: Exception, query_url: Optional[str] = None):
     """
     Handles unexpected errors during playback, informs the user,
     and provides instructions for reporting the bug.
@@ -89,6 +90,11 @@ async def handle_playback_error(guild_id: int, error: Exception, query_url: str 
         logger.info(
             f"Player for guild {guild_id} has been reset and disconnected due to a critical error."
         )
+    
+    # Run garbage collection after error cleanup
+    # GC Safety: Using generation 0 (quick) to clean up error-related objects
+    # This is safe and won't interfere with other guilds' playback
+    gc.collect(generation=0)
 
 
 # ==============================================================================
@@ -166,6 +172,13 @@ async def play_audio(guild_id, seek_time=0, is_a_loop=False, song_that_just_ende
                 and not music_player.autoplay_enabled
             ):
                 await music_player.queue.put(track_to_requeue)
+
+        # Clean up old data and run quick GC after song completion
+        # GC Safety: Using generation 0 (quick, ~1-5ms) to avoid blocking next track
+        # This is safe during playback transitions and won't cause audio glitches
+        from ..core import cleanup_old_data
+        cleanup_old_data(guild_id)
+        gc.collect(generation=0)  # Quick, non-blocking collection
 
         bot.loop.create_task(
             play_audio(

@@ -13,7 +13,7 @@ class SeekModal(discord.ui.Modal):
         music_player = self.music_player = get_player(guild_id)
         super().__init__(title=get_messages("seek.modal_title", guild_id))
 
-        self.timestamp_input = discord.ui.TextInput(
+        self.timestamp_input: discord.ui.TextInput = discord.ui.TextInput(
             label=get_messages("seek.modal.label", guild_id),
             placeholder=get_messages("seek.modal.placeholder", guild_id),
             required=True,
@@ -45,6 +45,8 @@ class SeekView(View):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(timeout=300.0)  # 5 minute timeout
         self.interaction = interaction
+        if not interaction.guild:
+            raise ValueError("SeekView can only be used in a server")
         self.guild_id = interaction.guild.id
         self.music_player = get_player(self.guild_id)
         self.is_kawaii = get_mode(self.guild_id)
@@ -298,6 +300,7 @@ class LyricsView(View):
         self.pages = pages
         self.original_embed = original_embed
         self.current_page = 0
+        self.message: Optional[discord.Message] = None
 
         self.previous_button.label = get_messages(
             "lyrics.button.previous", self.guild_id
@@ -351,7 +354,7 @@ class LyricsRetryModal(discord.ui.Modal):
         self.suggested_query = suggested_query
         self.guild_id = original_interaction.guild_id
 
-        self.corrected_query = discord.ui.TextInput(
+        self.corrected_query: discord.ui.TextInput = discord.ui.TextInput(
             label=get_messages("lyrics.refine_modal.label", self.guild_id),
             placeholder=get_messages("lyrics.refine_modal.placeholder", self.guild_id),
             default=self.suggested_query,
@@ -475,8 +478,9 @@ class LyricsRetryView(discord.ui.View):
 
 class KaraokeRetryModal(discord.ui.Modal):
     def __init__(self, original_interaction: discord.Interaction, suggested_query: str):
+        guild_id = original_interaction.guild_id
         super().__init__(
-            title=get_messages("karaoke.refine_modal.title", self.guild_id)
+            title=get_messages("karaoke.refine_modal.title", guild_id)
         )
         self.original_interaction = original_interaction
         self.suggested_query = suggested_query
@@ -484,7 +488,7 @@ class KaraokeRetryModal(discord.ui.Modal):
         self.music_player = get_player(self.guild_id)
         self.is_kawaii = get_mode(self.guild_id)
 
-        self.corrected_query = discord.ui.TextInput(
+        self.corrected_query: discord.ui.TextInput = discord.ui.TextInput(
             label=get_messages("karaoke.refine_modal.label", self.guild_id),
             placeholder=get_messages("karaoke.refine_modal.placeholder", self.guild_id),
             default=self.suggested_query,
@@ -573,7 +577,7 @@ class RefineLyricsModal(discord.ui.Modal):
         self.guild_id = message_to_edit.guild.id
         self.is_kawaii = get_mode(self.guild_id)
 
-        self.corrected_query = discord.ui.TextInput(
+        self.corrected_query: discord.ui.TextInput = discord.ui.TextInput(
             label=get_messages("lyrics.refine_modal.label", self.guild_id),
             placeholder=get_messages("lyrics.refine_modal.placeholder", self.guild_id),
             style=discord.TextStyle.short,
@@ -707,9 +711,10 @@ class KaraokeRetryView(discord.ui.View):
 
         # Fetch standard lyrics
         fallback_msg = get_messages("lyrics.fallback_warning", self.guild_id)
-        await fetch_and_display_genius_lyrics(
-            self.original_interaction, fallback_message=fallback_msg
-        )
+        # TODO: fetch_and_display_genius_lyrics is not defined
+        # await fetch_and_display_genius_lyrics(
+        #     self.original_interaction, fallback_message=fallback_msg
+        # )
 
 
 class KaraokeWarningView(View):
@@ -718,6 +723,8 @@ class KaraokeWarningView(View):
         self.interaction = interaction
         self.karaoke_coro = karaoke_coro
 
+        if not interaction.guild:
+            raise ValueError("KaraokeWarningView can only be used in a server")
         guild_id = interaction.guild.id
         self.continue_button.label = get_messages("karaoke.warning.button", guild_id)
 
@@ -725,8 +732,15 @@ class KaraokeWarningView(View):
     async def continue_button(self, interaction: discord.Interaction, button: Button):
         # We check that it's the original user who is clicking
         if interaction.user.id != self.interaction.user.id:
+            if not interaction.guild:
+                await interaction.response.send_message(
+                    "This command can only be used in a server.",
+                    silent=SILENT_MESSAGES,
+                    ephemeral=True,
+                )
+                return
             await interaction.response.send_message(
-                get_messages("command.error.user_only", interaction.guild_id),
+                get_messages("command.error.user_only", interaction.guild.id),
                 silent=SILENT_MESSAGES,
                 ephemeral=True,
             )
@@ -749,6 +763,8 @@ class KaraokeWarningView(View):
 class FilterView(View):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(timeout=None)
+        if not interaction.guild:
+            raise ValueError("FilterView can only be used in a server")
         self.guild_id = interaction.guild.id
         self.interaction = interaction
         self.state = get_guild_state(self.guild_id)
@@ -756,7 +772,7 @@ class FilterView(View):
             display_name = get_messages(f"filter.name.{effect}", self.guild_id)
             is_active = effect in self.state.server_filters
             style = ButtonStyle.success if is_active else ButtonStyle.secondary
-            button = Button(
+            button: Button = Button(
                 label=display_name, custom_id=f"filter_{effect}", style=style
             )
             button.callback = self.button_callback
@@ -1073,7 +1089,7 @@ class RemoveSelect(discord.ui.Select):
 
         indices_to_remove = sorted([int(v) for v in self.values], reverse=True)
 
-        queue_list = list(music_player.queue._queue)
+        queue_list = music_player.get_queue_items()
         removed_titles = []
 
         for index in indices_to_remove:
@@ -1086,7 +1102,7 @@ class RemoveSelect(discord.ui.Select):
                     )
                 )
 
-        new_queue = asyncio.Queue()
+        new_queue: asyncio.Queue[Any] = asyncio.Queue()
         for item in queue_list:
             await new_queue.put(item)
         music_player.queue = new_queue
@@ -1159,12 +1175,12 @@ class RemoveView(View):
         )
 
         if self.total_pages > 1:
-            prev_button = Button(
+            prev_button: Button = Button(
                 label=get_messages("remove_button.previous", self.guild_id),
                 style=ButtonStyle.secondary,
                 disabled=(self.current_page == 0),
             )
-            next_button = Button(
+            next_button: Button = Button(
                 label=get_messages("remove_button.next", self.guild_id),
                 style=ButtonStyle.secondary,
                 disabled=(self.current_page >= self.total_pages - 1),

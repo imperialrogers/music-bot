@@ -19,7 +19,7 @@ class LazySearchItem:
     ):
         self.query_dict = query_dict
         self.requester = requester
-        self.resolved_info = None
+        self.resolved_info: Optional[dict] = None
         self.search_lock = asyncio.Lock()
         self.original_platform = (
             original_platform  # Remembers the origin (Spotify, etc.)
@@ -44,7 +44,6 @@ class LazySearchItem:
         async with self.search_lock:
             if self.resolved_info:
                 return self.resolved_info
-
             if IS_PUBLIC_VERSION:
                 search_prefix = "scsearch5:"
                 platform_name = "SoundCloud"

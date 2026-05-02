@@ -143,6 +143,40 @@ This is the easiest way to get the bot running.
 * Generate an invite link with the `Connect`, `Speak`, and `Send Messages` permissions.
 * Add the bot to your server and enjoy `/play`!
 
+### Health Check Server (for Render & Hosting Platforms)
+
+The bot includes a built-in HTTP health check server that prevents services like Render from spinning down due to inactivity.
+
+**Endpoints:**
+* `/health` - Returns JSON with bot status and uptime
+* `/ping` - Simple text response ("pong") for basic health checks
+* `/status` - Detailed bot information with formatted uptime
+
+**Configuration:**
+* The server runs automatically on port **8080** by default
+* You can override the port using the `PORT` environment variable
+* The server runs in a daemon thread and won't block bot startup
+
+**For Render.com:**
+1. Deploy your bot to Render as a Web Service (not Background Worker)
+2. Render will automatically ping your service to keep it alive
+3. Your service URL will be: `https://your-app-name.onrender.com`
+4. Render pings the root URL (`/`) automatically, which returns health status
+
+**For other platforms (Railway, Fly.io, etc.):**
+1. Set up a cron job or uptime monitor (like UptimeRobot or Cron-Job.org)
+2. Configure it to ping: `https://your-app-url.com/health`
+3. Recommended interval: **10-14 minutes**
+4. This prevents the service from spinning down due to inactivity
+
+**Testing locally:**
+```bash
+# Start the bot, then in another terminal:
+curl http://localhost:8080/health
+curl http://localhost:8080/ping
+curl http://localhost:8080/status
+```
+
 ---
 
 
