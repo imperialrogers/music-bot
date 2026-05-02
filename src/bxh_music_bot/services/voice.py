@@ -6,8 +6,18 @@ from ..core import *
 async def fetch_video_info_with_retry(query: str, ydl_opts_override=None):
     """
     Fetches video info using yt-dlp, with a robust retry mechanism for age-restricted content.
-    This is the new universal function for all online fetching.
+    Supports PO tokens for newer yt-dlp versions to bypass bot detection.
     """
+    # Build extractor args with PO token support
+    extractor_args = {"youtube": {"player_client": ["android", "ios"]}}
+    
+    # Check for PO token in environment
+    po_token = os.getenv("YOUTUBE_PO_TOKEN")
+    if po_token:
+        logger.info("Using PO token for YouTube authentication")
+        extractor_args["youtube"]["po_token"] = [f"web+{po_token}"]
+        extractor_args["youtube"]["player_client"] = ["web"]
+    
     base_ydl_opts = {
         "format": "bestaudio[acodec=opus]/bestaudio/best",
         "quiet": True,
@@ -15,7 +25,7 @@ async def fetch_video_info_with_retry(query: str, ydl_opts_override=None):
         "no_color": True,
         "socket_timeout": 15,
         "source_address": "0.0.0.0",  # Force IPv4 to bypass VPS bot detection
-        "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
+        "extractor_args": extractor_args,
     }
     ydl_opts = {**base_ydl_opts, **(ydl_opts_override or {})}
 
@@ -506,7 +516,16 @@ def clear_audio_cache(guild_id: int):
 
 
 def get_full_opts():
-    """Returns standard options for fetching full metadata."""
+    """Returns standard options for fetching full metadata with PO token support."""
+    # Build extractor args with PO token support
+    extractor_args = {"youtube": {"player_client": ["android", "ios"]}}
+    
+    # Check for PO token in environment
+    po_token = os.getenv("YOUTUBE_PO_TOKEN")
+    if po_token:
+        extractor_args["youtube"]["po_token"] = [f"web+{po_token}"]
+        extractor_args["youtube"]["player_client"] = ["web"]
+    
     return {
         "format": "bestaudio/best",
         "quiet": True,
@@ -514,7 +533,7 @@ def get_full_opts():
         "noplaylist": True,
         "socket_timeout": 10,
         "source_address": "0.0.0.0",
-        "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
+        "extractor_args": extractor_args,
     }
 
 
